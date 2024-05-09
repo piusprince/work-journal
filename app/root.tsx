@@ -26,6 +26,13 @@ export default function App() {
         <Links />
       </head>
       <body>
+        <div className="mb-5">
+          <h1 className="mb-4 text-5xl font-bold">Work Journal</h1>
+          <p className="text-gray-500">
+            This is a journal of my work experiences and learnings. Updated
+            everyday with weekly summaries.
+          </p>
+        </div>
         <Outlet />
         <ScrollRestoration />
         <Scripts />
