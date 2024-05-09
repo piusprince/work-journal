@@ -2,8 +2,8 @@ import { useEffect, useRef } from "react";
 
 import { PrismaClient } from "@prisma/client";
 import type { ActionFunctionArgs, MetaFunction } from "@remix-run/node";
-import { Form, useFetcher } from "@remix-run/react";
-import { format } from "date-fns";
+import { Form, Link, useFetcher, useLoaderData } from "@remix-run/react";
+import { format, parseISO, startOfWeek } from "date-fns";
 
 export const meta: MetaFunction = () => {
   return [
@@ -39,9 +39,48 @@ export async function action({ request }: ActionFunctionArgs) {
   });
 }
 
+export async function loader() {
+  const db = new PrismaClient();
+  const entries = await db.entry.findMany();
+
+  return entries.map((entry) => ({
+    ...entry,
+    date: entry.date.toISOString().substring(0, 10),
+  }));
+}
+
 export default function Index() {
   const fetcher = useFetcher();
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
+  const entries = useLoaderData<typeof loader>();
+
+  // console.log({ entries });
+
+  let weeklyEntries = entries.reduce<Record<string, typeof entries>>(
+    (memo, entry) => {
+      let sunday = startOfWeek(parseISO(entry.date));
+      let sundayString = format(sunday, "yyyy-MM-dd");
+
+      memo[sundayString] ||= [];
+      memo[sundayString].push(entry);
+
+      return memo;
+    },
+    {}
+  );
+
+  let weekKeys = Object.keys(weeklyEntries)
+    .sort((a, b) => a.localeCompare(b))
+    .map((key) => ({
+      key,
+      work: weeklyEntries[key].filter((entry) => entry.type === "work"),
+      learning: weeklyEntries[key].filter((entry) => entry.type === "learning"),
+      interesting: weeklyEntries[key].filter(
+        (entry) => entry.type === "Interesting things"
+      ),
+    }));
+
+  console.log({ entries });
 
   useEffect(() => {
     if (fetcher.state === "idle" && textAreaRef.current) {
@@ -55,14 +94,8 @@ export default function Index() {
   });
 
   return (
-    <div>
-      <h1 className="mb-4 text-3xl font-bold">Work Journal</h1>
-      <p>
-        This is a journal of my work experiences and learnings. Updated everyday
-        with weekly summaries.
-      </p>
-
-      <div className="p-4 space-y-4 border ">
+    <div className="container mx-auto">
+      <div className="p-4 space-y-4 border mb-5">
         <p>Create an entry</p>
         <fetcher.Form className="space-y-4" method="post">
           <fieldset
@@ -119,12 +152,73 @@ export default function Index() {
             </div>
             <div>
               <button type="submit" className="p-2 text-white bg-blue-500">
-                {fetcher.state === "submitting" ? "Save..." : "Save"}
+                {fetcher.state === "submitting" ? "Saving..." : "Save"}
               </button>
             </div>
           </fieldset>
         </fetcher.Form>
       </div>
+
+      {weekKeys.map((week) => (
+        <div key={week.key} className="p-4 space-y-4 border ">
+          <p className="font-extrabold">
+            Week of {format(parseISO(week.key), "MMMM do")}
+          </p>
+
+          <div>
+            {week.learning.length > 0 && (
+              <div>
+                <h3>Learning</h3>
+                <ul className="ml-8 list-disc">
+                  {week.learning.map((entry) => (
+                    <EntryListItem entry={entry} />
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {week.work.length > 0 && (
+              <div>
+                <h3>Work</h3>
+                <ul className="ml-8 list-disc">
+                  {week.work.map((entry) => (
+                    <EntryListItem entry={entry} />
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {week.interesting.length > 0 && (
+              <div>
+                <h3>Interesting things</h3>
+                <ul className="ml-8 list-disc">
+                  {week.interesting.map((entry) => (
+                    <EntryListItem entry={entry} />
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        </div>
+      ))}
     </div>
+  );
+}
+
+export function EntryListItem({
+  entry,
+}: {
+  entry: Awaited<ReturnType<typeof loader>>[number];
+}) {
+  return (
+    <li key={entry.id} className="group">
+      {entry.text}
+      <Link
+        to={`/entries/${entry.id}/edit`}
+        className="text-blue-500 ml-2 group-hover:underline "
+      >
+        Edit
+      </Link>
+    </li>
   );
 }
