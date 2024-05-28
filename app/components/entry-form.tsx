@@ -1,12 +1,10 @@
-import { useRef } from "react";
+import { useRef, useEffect } from "react";
 
 import { useFetcher } from "@remix-run/react";
 import { format } from "date-fns";
-import { ActionFunctionArgs } from "@remix-run/node";
-import { PrismaClient } from "@prisma/client";
 
 type EntryFormProps = {
-  entry: {
+  entry?: {
     id: number;
     date: string;
     type: string;
@@ -14,17 +12,32 @@ type EntryFormProps = {
   };
 };
 
+const typeOptions = [
+  { value: "work", label: "Work" },
+  { value: "learning", label: "Learning" },
+  { value: "Interesting things", label: "Interesting things" },
+];
+
 export default function EntryForm({ entry }: EntryFormProps) {
   const fetcher = useFetcher();
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
 
-  console.log({ entry });
+  useEffect(() => {
+    if (
+      fetcher.state === "idle" &&
+      fetcher.data === null &&
+      textAreaRef.current
+    ) {
+      textAreaRef.current.value = "";
+      textAreaRef.current.focus();
+    }
+  }, [fetcher.state, fetcher.data]);
 
   return (
     <fetcher.Form className="space-y-4" method="post">
       <fieldset
         className="disabled:opacity-50"
-        disabled={fetcher.state === "submitting"}
+        disabled={fetcher.state !== "idle"}
       >
         <div>
           <input
@@ -32,40 +45,22 @@ export default function EntryForm({ entry }: EntryFormProps) {
             name="date"
             required
             className="text-gray-700"
-            defaultValue={entry.date}
+            defaultValue={entry?.date ?? format(new Date(), "yyyy-MM-dd")}
           />
         </div>
         <div className="space-x-6 flex">
-          <label className="flex items-center">
-            <input
-              className="mr-2"
-              type="radio"
-              name="category"
-              value="work"
-              defaultChecked={entry.type === "work"}
-            />
-            Work
-          </label>
-          <label className="flex items-center">
-            <input
-              type="radio"
-              className="mr-2"
-              name="category"
-              value="learning"
-              defaultChecked={entry.type === "learning"}
-            />
-            Learning
-          </label>
-          <label className="flex items-center">
-            <input
-              className="mr-2"
-              type="radio"
-              name="category"
-              value="Interesting things"
-              defaultChecked={entry.type === "Interesting things"}
-            />
-            Interesting things
-          </label>
+          {typeOptions.map((option) => (
+            <label key={option.value} className="flex items-center">
+              <input
+                className="mr-2"
+                type="radio"
+                name="category"
+                value={option.value}
+                defaultChecked={option.value === (entry?.type ?? "work")}
+              />
+              {option.label}
+            </label>
+          ))}
         </div>
         <div>
           <textarea
@@ -74,12 +69,12 @@ export default function EntryForm({ entry }: EntryFormProps) {
             placeholder="Write about your activities"
             required
             ref={textAreaRef}
-            defaultValue={entry.text}
+            defaultValue={entry?.text}
           />
         </div>
         <div>
           <button type="submit" className="p-2 text-white bg-blue-500">
-            {fetcher.state === "submitting" ? "Saving..." : "Save"}
+            {fetcher.state !== "idle" ? "Saving..." : "Save"}
           </button>
         </div>
       </fieldset>
