@@ -5,3 +5,7 @@
 html  {
     @apply antialiased text-gray-200 bg-gray-900;
 }
+
+body {
+    @apply container mx-auto;
+}
